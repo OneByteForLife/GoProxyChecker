@@ -1,0 +1,7 @@
+database:
+    username: "postgres"
+    host: "proxy-storage.in.net.ex" 
+    port: "5432" 
+    password: "qwerty"
+    dbname: "postgres"
+    sslmode: "disable"
