@@ -17,11 +17,11 @@ func ConnectToDatabase() *pgxpool.Pool {
 
 	logrus.Infof("Connecting by url - %s", urlConnect)
 
-	pool, err := pgxpool.Connect(context.Background(), urlConnect)
+	dbPool, err := pgxpool.Connect(context.Background(), urlConnect)
 	if err != nil {
 		logrus.Errorf("Err connect to database - %s", err)
 		return nil
 	}
 
-	return pool
+	return dbPool
 }
