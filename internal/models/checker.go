@@ -25,76 +25,45 @@ type ProxyList struct {
 	LastCheck time.Time
 }
 
-func FindingProxy() []ProxyList {
-	var list []ProxyList
-
+func FindingProxy(ch chan string, wg *sync.WaitGroup) {
+	var p ProxyList
 	dbPool := database.ConnectToDatabase()
 
-	query := "SELECT id, types, ip, port, speed, anonlvl, city, country, last_check FROM proxy_list"
+	query := "SELECT id, types, ip, port, speed, anonlvl, city, country, last_check FROM proxy_list WHERE types = 'http'"
 	rows, err := dbPool.Query(context.Background(), query)
 	if err != nil {
 		logrus.Errorf("Err request to database - %s", err)
+		return
 	}
-	// defer dbPool.Close()
+	defer dbPool.Close()
 
 	for rows.Next() {
-		var p ProxyList
 		err := rows.Scan(&p.ID, &p.Type, &p.IP, &p.Port, &p.Speed, &p.AnonLVL, &p.City, &p.Country, &p.LastCheck)
 		if err != nil {
 			logrus.Errorf("Err scan data - %s", err)
+			return
 		}
-		list = append(list, p)
+		ch <- fmt.Sprintf("%s://%s:%s", p.Type, p.IP, strconv.Itoa(p.Port))
 	}
-	dbPool.Close()
 
-	return list
+	close(ch)
+	defer wg.Done()
 }
-
-// wg *sync.WaitGroup
-func Checker(wg *sync.WaitGroup) ([]ProxyList, []ProxyList) {
-	list := FindingProxy()
-	var invalid []ProxyList
-
-	for idx, val := range list {
+func Checker(ch chan string, wg *sync.WaitGroup) {
+	for val := range ch {
 		wg.Add(1)
-		go func(idx int, val ProxyList) {
-			if val.Type == "http" {
-				status, speed, checkTime := CheckHTTP(fmt.Sprintf("%s://%s:%s", val.Type, val.IP, strconv.Itoa(val.Port)))
-				if speed < 1.0 {
-					speed = 1.0
-				}
-
-				if !status {
-					list[idx].LastCheck = checkTime
-					invalid = append(invalid, ProxyList{
-						ID:        val.ID,
-						Type:      val.Type,
-						IP:        val.IP,
-						Port:      val.Port,
-						Speed:     0,
-						AnonLVL:   val.AnonLVL,
-						City:      val.City,
-						Country:   val.Country,
-						LastCheck: val.LastCheck,
-					})
-					list = append(list[:idx], list[idx+1:]...)
-				} else {
-					list[idx].Speed = int(speed)
-					list[idx].LastCheck = checkTime
-				}
-			}
+		go func(val string) {
+			CheckHTTP(val)
 			defer wg.Done()
-		}(idx, val)
+		}(val)
 	}
-	wg.Wait()
-	return invalid, list
+	defer wg.Done()
 }
 
-func CheckHTTP(addr string) (bool, float64, time.Time) {
-	proxy, _ := url.Parse(addr)
-	fmt.Println(addr)
+func CheckHTTP(val string) {
+	proxy, _ := url.Parse(val)
 	client := http.Client{
-		Timeout: time.Second * 10,
+		Timeout: time.Second * 5,
 		Transport: &http.Transport{
 			Proxy: http.ProxyURL(proxy),
 		},
@@ -102,12 +71,10 @@ func CheckHTTP(addr string) (bool, float64, time.Time) {
 
 	resp, err := client.Get("http://api.ipify.org")
 	if err != nil {
-		return false, 0, time.Now()
+		logrus.Errorf("Proxy invalid - %s", err)
+		return
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return false, 0, time.Now()
-	}
-	return true, client.Timeout.Seconds(), time.Now()
+	logrus.Infof("Checked - %s %d\n", val, resp.StatusCode)
 }
