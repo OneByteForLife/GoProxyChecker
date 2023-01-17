@@ -13,6 +13,5 @@ func init() {
 func main() {
 	ch := make(chan string)
 	var wg sync.WaitGroup
-
 	app.Run(ch, &wg)
 }

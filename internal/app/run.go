@@ -6,7 +6,7 @@ import (
 )
 
 func Run(ch chan string, wg *sync.WaitGroup) {
-	wg.Add(1)
+	wg.Add(2)
 
 	go models.FindingProxy(ch, wg)
 	go models.Checker(ch, wg)

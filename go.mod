@@ -27,4 +27,5 @@ require (
 	golang.org/x/net v0.5.0
 	golang.org/x/sys v0.4.0 // indirect
 	golang.org/x/text v0.6.0 // indirect
+	h12.io/socks v1.0.3
 )

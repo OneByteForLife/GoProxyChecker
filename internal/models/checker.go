@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/proxy"
+	"h12.io/socks"
 )
 
 type ProxyList struct {
@@ -46,11 +46,11 @@ func FindingProxy(ch chan string, wg *sync.WaitGroup) {
 			logrus.Errorf("Err scan data - %s", err)
 			return
 		}
-		ch <- fmt.Sprintf("%s:%s", p.IP, strconv.Itoa(p.Port))
+		ch <- fmt.Sprintf("%s://%s:%s", p.Type, p.IP, strconv.Itoa(p.Port))
 	}
 
 	close(ch)
-	defer wg.Done()
+	wg.Done()
 }
 func Checker(ch chan string, wg *sync.WaitGroup) {
 	for val := range ch {
@@ -65,19 +65,15 @@ func Checker(ch chan string, wg *sync.WaitGroup) {
 				CheckSOCKS(val)
 			}
 		}(val)
-
 	}
 	defer wg.Done()
 }
 
 func CheckHTTP(val string) {
-	proxy, err := url.Parse(fmt.Sprintf("%s:%s", "http", val))
-	if err != nil {
-		logrus.Errorf("Err parce url - %s", err)
-		return
-	}
+	proxy, _ := url.Parse(val)
+
 	client := http.Client{
-		Timeout: time.Second * 5,
+		Timeout: time.Second * 10,
 		Transport: &http.Transport{
 			Proxy: http.ProxyURL(proxy),
 		},
@@ -86,15 +82,11 @@ func CheckHTTP(val string) {
 }
 
 func CheckSOCKS(val string) {
-	proxy, err := proxy.SOCKS5("tcp", val, nil, proxy.Direct)
-	if err != nil {
-		logrus.Errorf("Proxy invalid - %s", err)
-		return
-	}
+	proxy := socks.Dial(val)
+
 	client := http.Client{
-		Timeout: time.Second * 5,
 		Transport: &http.Transport{
-			Dial: proxy.Dial,
+			Dial: proxy,
 		},
 	}
 	RequesToCheck(val, client)
@@ -103,10 +95,15 @@ func CheckSOCKS(val string) {
 func RequesToCheck(val string, client http.Client) {
 	resp, err := client.Get("http://api.ipify.org")
 	if err != nil {
-		logrus.Errorf("Proxy invalid - %s", err)
+		logrus.Errorf("Proxy invalid - %s", val)
 		return
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		logrus.Errorf("Proxy invalid - %s", val)
+		return
+	}
 
 	logrus.Infof("Checked - %s [%d]\n", val, resp.StatusCode)
 }
