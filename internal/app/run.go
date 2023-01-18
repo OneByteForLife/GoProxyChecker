@@ -1,15 +1,15 @@
 package app
 
 import (
-	"GoProxyChecker/internal/models"
+	"GoProxyChecker/internal/proxy"
 	"sync"
 )
 
 func Run(ch chan string, wg *sync.WaitGroup) {
 	wg.Add(2)
 
-	go models.FindingProxy(ch, wg)
-	go models.Checker(ch, wg)
+	go proxy.FindProxy(ch, wg)
+	go proxy.Checker(ch, wg)
 
 	wg.Wait()
 }

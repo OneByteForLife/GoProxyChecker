@@ -1,7 +1,7 @@
 package database
 
 import (
-	"GoProxyChecker/internal/config"
+	"GoProxyChecker/pkg/config"
 	"context"
 	"fmt"
 
