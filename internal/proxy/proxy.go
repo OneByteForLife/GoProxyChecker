@@ -13,24 +13,14 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/sirupsen/logrus"
 	"h12.io/socks"
 )
 
-var once sync.Once
-var dbPool *pgxpool.Pool
-
-// Единожды открываем соединение с базой
-func InitDatabase() {
-	once.Do(func() {
-		dbPool = database.ConnectToDatabase()
-	})
-}
-
 // Выборка прокси из базы
 func FindProxy(ch chan string, wg *sync.WaitGroup) {
 	var p models.ProxyList
+	dbPool := database.ConnectToDatabase()
 
 	query := "SELECT id, types, ip, port, speed, anonlvl, city, country, last_check FROM proxy_list"
 	rows, err := dbPool.Query(context.Background(), query)
